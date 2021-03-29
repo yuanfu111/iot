@@ -107,7 +107,7 @@ tgacChannel.PathGainsOutputPort = 0;                    % DO NOT CHANGE THIS % E
 
 %% Simulation Parameters
 
-numPackets = 50; % NOTE: the more, the better for relability; Number of packets transmitted during the simulation 
+numPackets = 1000; % NOTE: the more, the better for relability; Number of packets transmitted during the simulation 
 
 % Select SNR for the simulation
 
