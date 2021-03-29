@@ -117,6 +117,21 @@ baseSNR = sin(linspace(1,10,numPackets)) * amplitude + meanSNR; % DO NOT CHANGE 
 maxJump = 0.5;                                                  % I will select this value myself in final evaluation ---> The maxJump controls the maximum SNR difference between one packet and the next 
 snrWalk = baseSNR(1);                                           % DO NOT CHANGE THIS % Set the initial SNR value
 
-TransmitRateControlTemplateET4394
+mode_choices=["sliding_and_change","sliding_and_choose","ARIMA"];
 
+% % results
+
+% meanSNR=meanSNR_choices(1);
+% amplitude=amplitude_choices(3);
+% maxJump=maxjump_choices(3);
+% tgacChannel.TransmitReceiveDistance =distance_choices(1);
+% distance=distance_choices(3);
+
+% numPackets=numPackets_choices(2);
+predict_mode=mode_choices(2);
+
+% s = rng(21)
+% results_1=TransmitRateControlTemplateET4394(tgacChannel,cfgVHT,numPackets,baseSNR,maxJump,snrWalk,meanSNR,amplitude,sr);
+% results_2=Rate_Control_Algorithm_2(tgacChannel,cfgVHT,nuPackets,baseSNR,maxJump,snrWalk,meanSNR,amplitude,sr,predict_mode);
+Rate_Control_Algorithm_1(tgacChannel,cfgVHT,numPackets,baseSNR,maxJump,snrWalk,meanSNR,amplitude,sr,predict_mode);
 % [PUT YOUR OWN RATE CONTROL SCRIP HERE FOLLOWING TransmitRateControlTemplateET4394 TEMPLATE]
