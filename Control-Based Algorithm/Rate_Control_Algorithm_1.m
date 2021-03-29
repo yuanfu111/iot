@@ -67,10 +67,10 @@ function results=Rate_Control_Algorithm_1(tgacChannel,cfgVHT,numPackets,baseSNR,
         % Store estimated SNR value for each packet
         if isempty(y.EstimatedSNR) 
             snrMeasured(1,numPkt) = NaN;
-            SNR_history=[SNR_history,0];
+%             SNR_history=[SNR_history,0];
         else
             snrMeasured(1,numPkt) = y.EstimatedSNR;
-            SNR_history=[SNR_history,y.EstimatedSNR];
+%             SNR_history=[SNR_history,y.EstimatedSNR];
         end
         
         % Determine the length of the packet in seconds including idle time
@@ -86,6 +86,13 @@ function results=Rate_Control_Algorithm_1(tgacChannel,cfgVHT,numPackets,baseSNR,
         
         % From here - This is an example rate control algorithm
         % [PLEASE REPLACE IT WITH YOUR OWN ALGORITHM]
+        
+        % Store estimated SNR value for each packet
+        if isempty(y.EstimatedSNR) 
+            SNR_history=[SNR_history,0];
+        else
+            SNR_history=[SNR_history,y.EstimatedSNR];
+        end
 
         if (ber(numPkt)<=1)
             current_channel_ber=current_channel_ber+ber(numPkt)/channel_windows_size;
@@ -201,5 +208,106 @@ function results=Rate_Control_Algorithm_1(tgacChannel,cfgVHT,numPackets,baseSNR,
     'Data_rate',        ov_dr, ...
     'PER',              ov_per);
 
+end
+
+
+
+% NOTE: TRY NOT TO CHANGE THIS FUNCTION - let us make the packet processing the same for everyone
+function Y = processPacket(txWave,snrWalk,tgacChannel,cfgVHT)
+    % Pass the transmitted waveform through the channel, perform
+    % receiver processing, and SNR estimation.
+    
+    chanBW = cfgVHT.ChannelBandwidth; % Channel bandwidth
+    % Set the following parameters to empty for an undetected packet
+    estimatedSNR = [];
+    eqDataSym = [];
+    noiseVarVHT = [];
+    rxPSDU = [];
+    
+    ofdmInfo = wlanVHTOFDMInfo('VHT-Data',cfgVHT); % Get the OFDM info
+    rxWave = tgacChannel(txWave); % Pass the waveform through the fading channel model
+   
+    awgnChannel = comm.AWGNChannel; % Create an instance of the AWGN channel for each transmitted packet
+    awgnChannel.NoiseMethod = 'Signal to noise ratio (SNR)';
+    awgnChannel.SignalPower = 1/tgacChannel.NumReceiveAntennas; % Normalization
+    awgnChannel.SNR = snrWalk - 10 * log10(ofdmInfo.FFTLength/ofdmInfo.NumTones); % Account for energy in nulls
+    
+    rxWave = awgnChannel(rxWave); % Add noise
+    rxWaveformLength = size(rxWave,1); % Length of the received waveform
+    
+    % Recover packet
+    ind = wlanFieldIndices(cfgVHT); % Get field indices
+    pktOffset = wlanPacketDetect(rxWave,chanBW); % Detect packet
+    
+    if ~isempty(pktOffset) % If packet detected
+        LLTFSearchBuffer = rxWave(pktOffset+(ind.LSTF(1):ind.LSIG(2)),:); % Extract the L-LTF field for fine timing synchronization
+        finePktOffset = wlanSymbolTimingEstimate(LLTFSearchBuffer,chanBW); % Start index of L-LTF field
+        pktOffset = pktOffset + finePktOffset; % Determine final packet offset
+        
+        if pktOffset < 15 % If synchronization successful
+            % Extract VHT-LTF samples from the waveform, demodulate and perform channel estimation
+            VHTLTF = rxWave(pktOffset + (ind.VHTLTF(1):ind.VHTLTF(2)),:);
+            demodVHTLTF = wlanVHTLTFDemodulate(VHTLTF,cfgVHT);
+            chanEstVHTLTF = wlanVHTLTFChannelEstimate(demodVHTLTF,cfgVHT);
+            chanEstSSPilots = vhtSingleStreamChannelEstimate(demodVHTLTF,cfgVHT); % Get single stream channel estimate
+            vhtdata = rxWave(pktOffset+(ind.VHTData(1):ind.VHTData(2)),:); % Extract VHT data field
+            noiseVarVHT = vhtNoiseEstimate(vhtdata,chanEstSSPilots,cfgVHT); % Estimate the noise power in VHT data field
+            
+            % Recover equalized symbols at data carrying subcarriers using channel estimates from VHT-LTF
+            [rxPSDU,~,eqDataSym] = wlanVHTDataRecover(vhtdata,chanEstVHTLTF,noiseVarVHT,cfgVHT);
+            
+            % SNR estimation per receive antenna
+            powVHTLTF = mean(VHTLTF.*conj(VHTLTF));
+            estSigPower = powVHTLTF - noiseVarVHT;
+            estimatedSNR = 10*log10(mean(estSigPower./noiseVarVHT));
+        end
+    end
+    
+    % Set output
+    Y = struct( ...
+        'RxPSDU',           rxPSDU, ...
+        'EqDataSym',        eqDataSym, ...
+        'RxWaveformLength', rxWaveformLength, ...
+        'NoiseVar',         noiseVarVHT, ...
+        'EstimatedSNR',     estimatedSNR);
+    
+end
+
+function plotResults(ber,packetLength,snrMeasured,MCS,cfgVHT)
+    % Visualize simulation results
+
+    figure('Outerposition',[50 50 900 700])
+    subplot(4,1,1);
+    plot(MCS);
+    xlabel('Packet Number')
+    ylabel('MCS')
+    title('MCS selected for transmission')
+
+    subplot(4,1,2);
+    plot(snrMeasured);
+    xlabel('Packet Number')
+    ylabel('SNR')
+    title('Estimated SNR')
+
+    subplot(4,1,3);
+    plot(find(ber==0),ber(ber==0),'x') 
+    hold on; stem(find(ber>0),ber(ber>0),'or') 
+    if any(ber)
+        legend('Successful decode','Unsuccessful decode') 
+    else
+        legend('Successful decode') 
+    end
+    xlabel('Packet Number')
+    ylabel('BER')
+    title('Instantaneous bit error rate per packet')
+
+    subplot(4,1,4);
+    windowLength = 3; % Length of the averaging window
+    movDataRate = movsum(8*cfgVHT.APEPLength.*(ber==0),windowLength)./movsum(packetLength,windowLength)/1e6;
+    plot(movDataRate)
+    xlabel('Packet Number')
+    ylabel('Mbps')
+    title(sprintf('Throughput over last %d packets',windowLength))
+    
 end
 
