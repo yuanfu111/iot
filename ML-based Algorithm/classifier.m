@@ -71,8 +71,9 @@ for numPkt = 1:numPackets
     end
     % From here - This is an example rate control algorithm
     % [PLEASE REPLACE IT WITH YOUR OWN ALGORITHM]
-    
+
     MCS(numPkt) = cfgVHT.MCS;
+    %using weightes moving average to generate the input SNR
     if numPkt ==1
         SNR_pred=snrMeasured(1,1);
     end   
@@ -88,44 +89,40 @@ for numPkt = 1:numPackets
     end
 
     input=[model SNR_pred];
-    %T=array2table(input,'VariableNames',{'Model','SNR'});
-   % y_pred=trainedModel.predictFcn(T);
-    y_pred=NeuralNetwork(input);
+   
+    y_pred=NeuralNetwork(input);%feed the input to the NN model
+    
+    %If the channel condition is really bad, do not give any compensation
     if SNR_pred<3
         y_pred=0;
         compensate=0;
     end
-    
     mcs_pred=y_pred;
-        if (ber(numPkt)<=1)
-            current_transmission_condition=current_transmission_condition+ber(numPkt)/update_sliding_windows;
-        else 
-            current_transmission_condition=current_transmission_condition+1/update_sliding_windows;
-        end   
-        %current_transmission_condition=current_transmission_condition/update_sliding_windows;
-        %current_transmission_condition=current_transmission_condition;
-        current_transmission_condition=0.25*previous_transmission_condition+0.75*current_transmission_condition;
-        previous_transmission_condition=current_transmission_condition;
+    
+    %calculated the transmission condition
+    if (ber(numPkt)<=1)
+        current_transmission_condition=current_transmission_condition+ber(numPkt)/update_sliding_windows;
+    else 
+        current_transmission_condition=current_transmission_condition+1/update_sliding_windows;
+    end   
+
+    current_transmission_condition=0.25*previous_transmission_condition+0.75*current_transmission_condition;
+    previous_transmission_condition=current_transmission_condition;
         
-    if mod(numPkt,update_sliding_windows)==0 %&& SNR_pred>=3
+    %set compensation value
+    if mod(numPkt,update_sliding_windows)==0 
         compensate=0;
         if current_transmission_condition<0.2 
-            compensate =+1; 
+            compensate =1; 
         end    
         if current_transmission_condition>1
                 compensate =-1;
         end   
         current_transmission_condition=0;
     end
-%     if compensate >3
-%         compensate =3;
-%     end   
-%     if compensate <-3
-%         compensate =-3;
-%     end   
-    %compensate
-    mcs_pred=mcs_pred+compensate;
 
+    mcs_pred=mcs_pred+compensate;
+    %limit the mcs value in a valid range
     if mcs_pred>9
         mcs_pred=9;
     else
@@ -133,11 +130,6 @@ for numPkt = 1:numPackets
             mcs_pred=0;
         end
     end
-    %mcs_pred
-    %if 0<y_pred&&y_pred<9
-    %    mcs_pred=mcs_pred+compensate;
-    %end
-    %mcs_pred
     cfgVHT.MCS=mcs_pred;
     % [PLEASE REPLACE IT WITH YOUR OWN ALGORITHM]
     % To here - This is an example rate control algorithm
