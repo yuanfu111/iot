@@ -3,8 +3,10 @@
 There are two folders with codes in them: ``Control-Based Algorithm`` Folder and ``ML-based Algorithm`` Folder
 
 ## Machine-Learning Based algorithm
-
-
+* ``classifier.m`` is the implementation of ML-based rate control algorithm.
+* ``NeuralNetwork.m`` is the trained model to make prediction.
+* ``data_preprocessing.py`` is used to preprocess the training data.
+* ``encode_model.m`` is a simple function to encode the delay model.
 
 ## Control-Based Algorithm Folder
 
