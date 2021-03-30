@@ -2,8 +2,13 @@
 
 There are two folders with codes in them: ``Control-Based Algorithm`` Folder and ``ML-based Algorithm`` Folder
 
-1. Machine-Learning Based algorithm
+## Machine-Learning Based algorithm
 
 
 
-3. Control-Based Algorithm Folder, this folder contains the Control-Based Algorithm RCA
+## Control-Based Algorithm Folder
+
+This folder contains the Control-Based Algorithm RCA.
+``Rate_Control_Algorithm_1.m`` contains the main process of Control-Based algorithm.
+``compensate.m`` contains the outer loop long-term feedback codes.
+``predict.m`` contains the SNR prediction and SNR-MCS mapping codes.
